@@ -71384,7 +71384,7 @@ j.push(A.dC(A.a([r,new A.br(new A.aM(32,0,32,0),q,n),A.my(B.ba,p,B.Q,10,20)],s),
 for(k=l.a,o=0;o<4;++o)p[o]=A.fC(!1,n,!0,new A.el(20,20,A.oP(k[o].i(0,"asset"),new A.h2(A.V(a).go,B.aY,n,B.br),B.aZ,n,n),n),n,!0,n,n,n,n,n,n,n,n,n,new A.a0K(l,o),n,n,n,n)
 j.push(A.ew(A.a([A.my(B.ba,p,B.Q,10,20),A.aU(n,16,n),A.ba(A.bN(m),A.cN(n,n,A.V(a).go,n,n,n,n,n,n,n,n,14,n,n,n,n,n,!0,n,n,n,n,n,n,n,n),n,n)],s),B.T,B.a4,B.M))}return new A.br(B.Kg,A.ew(j,B.T,B.a4,B.M),n)}}
 A.a0I.prototype={
-$0(){return B.cw.lU(window,"https://career.programmers.co.kr/pr/parrottkim21_1393","_blank")},
+$0(){return B.cw.lU(window,"https://drive.google.com/file/d/1_xwfzxlWoqlX05lv7w6IEdFl1ySDC1sL/view?usp=sharing","_blank")},
 $S:0}
 A.a0J.prototype={
 $0(){return B.cw.lU(window,this.a.a[this.b].i(0,"link"),"_blank")},
