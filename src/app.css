@@ -1,0 +1,376 @@
+@import 'lenis/dist/lenis.css';
+@import 'tailwindcss';
+
+/* Theme */
+
+@theme inline {
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-surface: var(--surface);
+	--color-muted: var(--muted);
+	--color-border: var(--border);
+	--color-accent: var(--accent);
+
+	--font-sans: 'Pretendard Variable', sans-serif;
+	--font-display: 'Geist', 'Pretendard Variable', sans-serif;
+	--font-mono: 'Geist Mono', monospace;
+
+	--spacing-gutter: var(--page-gutter);
+	--spacing-section: var(--section-spacing);
+	--spacing-container: var(--container-width);
+	--spacing-grid: var(--grid-gap);
+}
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* Design Tokens */
+
+:root {
+	color-scheme: light;
+
+	/* Layout */
+
+	--page-gutter: clamp(1.25rem, 4vw, 4rem);
+	--section-spacing: clamp(5rem, 10vw, 10rem);
+	--container-width: 100rem;
+	--grid-gap: clamp(0.75rem, 1.5vw, 1.5rem);
+
+	/* Typography Scale */
+
+	--font-size-caption: 0.75rem;
+	--font-size-label: 0.875rem;
+	--font-size-body: 1rem;
+	--font-size-lead: clamp(1.125rem, 1.5vw, 1.5rem);
+
+	--font-size-h1: clamp(2.5rem, 6.25vw, 6rem);
+	--font-size-h2: clamp(2rem, 4.5vw, 4rem);
+	--font-size-h3: clamp(1.5rem, 3vw, 2.5rem);
+	--font-size-h4: clamp(1.25rem, 2vw, 1.75rem);
+	--font-size-h5: 1.25rem;
+	--font-size-h6: 1rem;
+
+	/* Korean Typography */
+
+	--type-body-leading: 1.6;
+	--type-body-tracking: -0.03em;
+
+	--type-heading-leading: 1.2;
+	--type-heading-tracking: -0.045em;
+	--type-h1-tracking: -0.06em;
+	--type-h2-tracking: -0.055em;
+	--type-h3-leading: 1.25;
+
+	--type-display-leading: 1.15;
+	--type-display-tracking: -0.065em;
+
+	--type-lead-leading: 1.45;
+	--type-lead-tracking: -0.035em;
+
+	--type-reading-leading: 1.7;
+
+	/* Colors */
+
+	--background: #f7f7f3;
+	--foreground: #202522;
+	--surface: #eeefea;
+	--muted: #686e68;
+	--border: #dfe3dd;
+	--accent: #526b59;
+
+	--selection-background: #202522;
+	--selection-foreground: #f7f7f3;
+
+	/* Loading */
+
+	--loading-track: #dfe3dd;
+	--loading-bar: #526b59;
+
+	/* Hero */
+
+	--hero-glow-color: 121 147 171;
+	--hero-glow-opacity: 0.16;
+
+	--hero-tunnel-background: #f1f5f0;
+	--hero-tunnel-star-1: #102b1b;
+	--hero-tunnel-star-2: #215c37;
+	--hero-tunnel-star-3: #327c4c;
+	--hero-tunnel-star-4: #4b9565;
+	--hero-tunnel-opacity: 0.82;
+}
+
+/* English Typography */
+
+:root:lang(en) {
+	--type-body-leading: 1.5;
+	--type-body-tracking: -0.015em;
+
+	--type-heading-leading: 1.1;
+	--type-heading-tracking: -0.04em;
+	--type-h1-tracking: -0.04em;
+	--type-h2-tracking: -0.04em;
+	--type-h3-leading: 1.15;
+
+	--type-display-leading: 1;
+	--type-display-tracking: -0.055em;
+
+	--type-lead-leading: 1.35;
+	--type-lead-tracking: -0.025em;
+
+	--type-reading-leading: 1.65;
+}
+
+/* Dark Theme */
+
+:root[data-theme='dark'] {
+	color-scheme: dark;
+
+	--background: #171b19;
+	--foreground: #f5f5f2;
+	--surface: #202622;
+	--muted: #a0aba2;
+	--border: #39443d;
+	--accent: #b7cfba;
+
+	--selection-background: #f5f5f2;
+	--selection-foreground: #171b19;
+
+	--loading-track: #39443d;
+	--loading-bar: #b7cfba;
+
+	--hero-glow-color: 121 147 171;
+	--hero-glow-opacity: 0.12;
+
+	--hero-tunnel-background: #020a06;
+	--hero-tunnel-star-1: #ffffff;
+	--hero-tunnel-star-2: #c3f3bd;
+	--hero-tunnel-star-3: #7edb7c;
+	--hero-tunnel-star-4: #6bcf9c;
+	--hero-tunnel-opacity: 1;
+}
+
+/* Base */
+
+@layer base {
+	html {
+		min-height: 100%;
+		font-size: 100%;
+		scroll-behavior: auto;
+		scrollbar-width: none;
+		-webkit-text-size-adjust: 100%;
+	}
+
+	html::-webkit-scrollbar {
+		display: none;
+	}
+
+	body {
+		min-height: 100vh;
+		min-height: 100dvh;
+
+		background: var(--background);
+		color: var(--foreground);
+
+		font-family: var(--font-sans);
+		font-size: var(--font-size-body);
+		font-weight: 400;
+		line-height: var(--type-body-leading);
+		letter-spacing: var(--type-body-tracking);
+
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+	}
+
+	/* Typography */
+
+	h1,
+	h2,
+	h3,
+	h4,
+	h5,
+	h6 {
+		letter-spacing: var(--type-heading-tracking);
+	}
+
+	h1,
+	h2,
+	h3,
+	h4 {
+		font-weight: 600;
+	}
+
+	h5,
+	h6 {
+		font-weight: 500;
+	}
+
+	h1 {
+		font-size: var(--font-size-h1);
+		line-height: var(--type-heading-leading);
+		letter-spacing: var(--type-h1-tracking);
+	}
+
+	h2 {
+		font-size: var(--font-size-h2);
+		line-height: var(--type-heading-leading);
+		letter-spacing: var(--type-h2-tracking);
+	}
+
+	h3 {
+		font-size: var(--font-size-h3);
+		line-height: var(--type-h3-leading);
+	}
+
+	h4 {
+		font-size: var(--font-size-h4);
+		line-height: 1.3;
+	}
+
+	h5 {
+		font-size: var(--font-size-h5);
+		line-height: 1.35;
+		letter-spacing: -0.035em;
+	}
+
+	h6 {
+		font-size: var(--font-size-h6);
+		line-height: 1.35;
+		letter-spacing: -0.025em;
+	}
+
+	p {
+		overflow-wrap: break-word;
+	}
+
+	small {
+		font-size: var(--font-size-caption);
+		line-height: 1.2;
+		letter-spacing: -0.01em;
+	}
+
+	strong,
+	b {
+		font-weight: 600;
+	}
+
+	code,
+	kbd,
+	samp,
+	pre {
+		font-family: var(--font-mono);
+		letter-spacing: 0;
+	}
+
+	/* Interactive Elements */
+
+	button,
+	a,
+	input,
+	textarea,
+	select {
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	button,
+	input,
+	select {
+		line-height: 1.2;
+	}
+
+	button:not(:disabled) {
+		cursor: pointer;
+	}
+
+	button:disabled {
+		cursor: not-allowed;
+	}
+
+	textarea {
+		resize: vertical;
+	}
+
+	/* Accessibility */
+
+	:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 4px;
+	}
+
+	::selection {
+		background: var(--selection-background);
+		color: var(--selection-foreground);
+	}
+
+	::placeholder {
+		color: var(--muted);
+		opacity: 1;
+	}
+
+	hr {
+		border-color: var(--border);
+	}
+}
+
+/* Layout Utilities */
+
+@utility page-container {
+	width: 100%;
+	max-width: var(--container-width);
+	margin-inline: auto;
+	padding-inline: var(--page-gutter);
+}
+
+@utility section-spacing {
+	padding-block: var(--section-spacing);
+}
+
+/* Typography Utilities */
+
+@utility text-display {
+	font-family: var(--font-display);
+	font-size: clamp(3rem, 10vw, 10rem);
+	font-weight: 600;
+	line-height: var(--type-display-leading);
+	letter-spacing: var(--type-display-tracking);
+}
+
+@utility text-lead {
+	font-size: var(--font-size-lead);
+	font-weight: 500;
+	line-height: var(--type-lead-leading);
+	letter-spacing: var(--type-lead-tracking);
+}
+
+@utility text-label {
+	font-size: var(--font-size-label);
+	font-weight: 600;
+	line-height: 1.2;
+	letter-spacing: -0.02em;
+}
+
+@utility text-caption {
+	font-size: var(--font-size-caption);
+	line-height: 1.2;
+	letter-spacing: -0.01em;
+}
+
+@utility text-eyebrow {
+	font-family: var(--font-mono);
+	font-size: var(--font-size-caption);
+	color: var(--muted);
+	line-height: 1.2;
+	letter-spacing: 0;
+	text-transform: uppercase;
+}
+
+@utility text-reading {
+	max-width: 65ch;
+	line-height: var(--type-reading-leading);
+}
+
+/* Reduced Motion */
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto !important;
+	}
+}

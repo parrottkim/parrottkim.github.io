@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ko">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="text-scale" content="scale" />
+
+		<script>
+			const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+
+			function applySystemTheme() {
+				document.documentElement.dataset.theme = systemTheme.matches ? 'dark' : 'light';
+			}
+
+			// 페이지 최초 진입
+			applySystemTheme();
+
+			// OS 테마 변경 시 즉시 반영
+			systemTheme.addEventListener('change', applySystemTheme);
+		</script>
+
+		<!-- Pretendard -->
+		<link
+			rel="stylesheet"
+			href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+		/>
+
+		<!-- Geist / Geist Mono -->
+		<link
+			rel="stylesheet"
+			href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap"
+		/>
+
+		<link
+			rel="icon"
+			type="image/x-icon"
+			media="(prefers-color-scheme: light)"
+			href="%sveltekit.assets%/favicon-light.ico"
+		/>
+
+		<link
+			rel="icon"
+			type="image/x-icon"
+			media="(prefers-color-scheme: dark)"
+			href="%sveltekit.assets%/favicon-dark.ico"
+		/>
+
+		<link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
+		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
+
+		%sveltekit.head%
+	</head>
+
+	<body data-sveltekit-preload-data="hover">
+		<div id="initial-loader" role="status" aria-label="로딩 중">
+			<div class="loader-symbol">
+				<svg viewBox="0 0 60 60" aria-hidden="true">
+					<polygon class="hexagon-track" points="30,4 52.5,17 52.5,43 30,56 7.5,43 7.5,17" />
+					<polygon
+						class="hexagon-progress"
+						points="30,4 52.5,17 52.5,43 30,56 7.5,43 7.5,17"
+						pathLength="1"
+					/>
+				</svg>
+
+				<span class="loader-icon" aria-hidden="true"></span>
+			</div>
+
+			<p class="loader-caption">HYUNJIN KIM <span>— PORTFOLIO / 2026</span></p>
+		</div>
+
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>
+
+<style>
+	#initial-loader {
+		position: fixed;
+		inset: 0;
+		z-index: 9999;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 24px;
+		background: var(--background);
+		color: var(--foreground);
+		font-family: sans-serif;
+		transition: opacity 500ms ease;
+	}
+
+	#initial-loader.hidden {
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.loader-symbol {
+		position: relative;
+		width: 60px;
+		height: 60px;
+	}
+
+	.loader-symbol svg {
+		display: block;
+		width: 100%;
+		height: 100%;
+	}
+
+	.loader-icon {
+		position: absolute;
+		inset: 0;
+		margin: 16px;
+		background: var(--loading-bar);
+		-webkit-mask: url('/images/parrot.svg') center / contain no-repeat;
+		mask: url('/images/parrot.svg') center / contain no-repeat;
+	}
+
+	.loader-caption {
+		position: absolute;
+		bottom: 40px;
+		left: 50%;
+		transform: translateX(-50%);
+		white-space: nowrap;
+		font-family: 'Geist Mono', monospace;
+		font-size: 10px;
+		letter-spacing: 0.14em;
+		color: var(--foreground);
+		opacity: 0.45;
+	}
+
+	.hexagon-track,
+	.hexagon-progress {
+		fill: none;
+		stroke-linejoin: round;
+	}
+
+	.hexagon-track {
+		stroke: var(--loading-track);
+		stroke-width: 2;
+	}
+
+	.hexagon-progress {
+		stroke: var(--loading-bar);
+		stroke-width: 2;
+		stroke-linecap: butt;
+
+		stroke-dasharray: 1;
+		stroke-dashoffset: calc(1 - var(--progress, 0));
+
+		transition: stroke-dashoffset 450ms ease;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.hexagon-progress,
+		#initial-loader {
+			transition: none;
+		}
+	}
+</style>
