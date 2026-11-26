@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { initializeScroll } from '#lib/scroll/index.ts';
+	import { initializeScroll } from '#lib/scroll/scroll.ts';
 	import '../app.css';
 
 	let { children } = $props();

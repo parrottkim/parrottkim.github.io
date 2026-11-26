@@ -4,8 +4,12 @@
 	import { gsap } from 'gsap';
 	import { ScrollTrigger } from 'gsap/ScrollTrigger';
 	import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-	import { isScrollLocked, lockScroll, scrollToImmediately } from '#lib/scroll/index.ts';
-	import { bindScrollInput, type ScrollDirection } from '#lib/scroll/input.ts';
+	import {
+		bindScrollInput,
+		isScrollLocked,
+		lockScroll,
+		scrollToImmediately
+	} from '#lib/scroll/scroll.ts';
 	import { createHeroScene } from './scene';
 
 	let { model }: { model: GLTF } = $props();
@@ -31,15 +35,6 @@
 		// HMR로 재마운트되거나 이미 스크롤된 페이지라면 인트로 생략
 		const skipIntro = reducedMotion || savedState?.introFinished === true || window.scrollY > 1;
 
-		// Intro Scroll Lock
-		const previousOverflow = document.body.style.overflow;
-		let releaseIntroScroll: (() => void) | undefined;
-
-		if (!skipIntro) {
-			document.body.style.overflow = 'hidden';
-			releaseIntroScroll = lockScroll();
-		}
-
 		let disposed = false;
 		let isVisible = true;
 		let introFinished = skipIntro;
@@ -50,6 +45,7 @@
 		});
 
 		const { pivot, setLidProgress, setScreenActive, updateTransition } = heroScene;
+		let releaseIntroScroll = skipIntro ? undefined : lockScroll();
 
 		function smoothstep(start: number, end: number, value: number) {
 			const t = MathUtils.clamp((value - start) / (end - start), 0, 1);
@@ -78,8 +74,9 @@
 
 		let openingTrigger: ScrollTrigger | null = null;
 		let scrollContext: ReturnType<typeof gsap.context> | undefined;
-		let syncHeroInput = () => {};
 		let releaseBoundaryScroll: (() => void) | undefined;
+		let waitingForExperienceGesture = false;
+		let boundaryRefreshFrame = 0;
 
 		function renderTransition() {
 			const motion = phase === 'entering' || phase === 'leaving' ? phase : 'normal';
@@ -117,17 +114,14 @@
 
 			onComplete: () => {
 				phase = 'experience';
-				releaseBoundary();
-				syncHeroInput();
+				heroInput.consumeGesture();
+				waitingForExperienceGesture = Boolean(releaseBoundaryScroll);
 				renderTransition();
 				saveHmrState();
 			},
 
 			onReverseComplete: () => {
-				phase = 'ready';
-				holdBoundary();
-				syncHeroInput();
-				setLidProgress(1);
+				readyAtBoundary();
 				renderTransition();
 				saveHmrState();
 			}
@@ -197,8 +191,9 @@
 		}
 
 		function releaseBoundary() {
-			releaseBoundaryScroll?.();
+			const release = releaseBoundaryScroll;
 			releaseBoundaryScroll = undefined;
+			release?.();
 		}
 
 		function enterExperience() {
@@ -207,7 +202,6 @@
 
 			phase = 'entering';
 			holdBoundary();
-			syncHeroInput();
 
 			setLidProgress(1);
 			renderTransition();
@@ -220,96 +214,87 @@
 
 			phase = 'leaving';
 			holdBoundary();
-			syncHeroInput();
 
+			getExperience()?.dispatchEvent(new Event('experience-reveal-leave'));
 			renderTransition();
 			transition.timeScale(1.35).reverse();
 		}
 
-		function handleDirection(direction: ScrollDirection, isNewGesture: boolean) {
+		function handleDirection(direction: 1 | -1, isNewGesture: boolean) {
 			if (!introFinished || reducedMotion || !openingTrigger || !getExperience()) return false;
-
-			// 트랙패드 관성의 미세한 반대 델타가 전환을 앞뒤로 흔들지 않게 한다.
+			if (waitingForExperienceGesture) return true;
 			if (phase === 'entering' || phase === 'leaving') return true;
 
-			const boundary = scrollBoundary();
+			if (phase === 'ready') {
+				if (!isNewGesture) return true;
+				if (direction > 0) {
+					enterExperience();
+					return true;
+				}
+				phase = 'opening';
+				releaseBoundary();
+				return false;
+			}
 
-			if (phase === 'ready' && direction === 1 && window.scrollY >= boundary - 3) {
-				enterExperience();
+			if (phase !== 'experience' || (!releaseBoundaryScroll && isScrollLocked())) return false;
+			if (!releaseBoundaryScroll && Math.abs(window.scrollY - scrollBoundary()) > 3) return false;
+
+			if (direction < 0) {
+				if (!releaseBoundaryScroll) {
+					holdForReturn();
+				} else if (isNewGesture) {
+					returnToHero();
+				}
 				return true;
 			}
 
-			if (
-				phase === 'experience' &&
-				!isScrollLocked() &&
-				direction === -1 &&
-				Math.abs(window.scrollY - boundary) <= 3
-			) {
-				if (isNewGesture) returnToHero();
-				return true;
-			}
-
+			if (releaseBoundaryScroll && !isNewGesture) return true;
+			releaseBoundary();
 			return false;
 		}
 
-		function stopAtExperienceBoundary() {
+		function holdForReturn() {
 			heroInput.consumeGesture();
 			holdBoundary();
-			releaseBoundary();
-		}
-
-		function stopAtBoundary(delta: number) {
-			if (!introFinished || reducedMotion || !openingTrigger) return false;
-
-			const y = window.scrollY;
-			const end = openingTrigger.end;
-
-			if (phase === 'opening' && delta > 0 && y < end && y + delta >= end) {
-				setLidProgress(1);
-				phase = 'ready';
-				holdBoundary();
-				syncHeroInput();
-				return true;
-			}
-
-			if (
-				phase === 'experience' &&
-				!isScrollLocked() &&
-				delta < 0 &&
-				y > end + 3 &&
-				y + delta <= end
-			) {
-				stopAtExperienceBoundary();
-				return true;
-			}
-
-			return false;
 		}
 
 		const heroInput = bindScrollInput({
+			onNewGesture() {
+				if (!waitingForExperienceGesture) return;
+				waitingForExperienceGesture = false;
+				releaseBoundary();
+			},
 			handleDirection,
-			stopAtBoundary,
-			isTransitioning: () => phase === 'entering' || phase === 'leaving',
-			shouldCapture: () => {
-				if (!openingTrigger || reducedMotion) return false;
-				if (phase === 'ready' || phase === 'entering' || phase === 'leaving') return true;
+			getBoundary(delta) {
+				if (!introFinished || reducedMotion || !openingTrigger) return;
+				const y = window.scrollY;
+				const end = openingTrigger.end;
 
-				const range = Math.max(160, window.innerHeight * 0.12);
-				const distance = window.scrollY - openingTrigger.end;
-
-				if (phase === 'opening') return distance >= -range;
-				if (phase === 'experience') return distance <= range;
-
-				return false;
+				if (phase === 'opening' && delta > 0 && y < end && y + delta >= end) {
+					return { position: end, stop: enterExperience };
+				}
+				if (
+					phase === 'experience' &&
+					!isScrollLocked() &&
+					delta < 0 &&
+					(Math.abs(y - end) <= 3 || (y > end && y + delta <= end))
+				) {
+					return { position: end, stop: holdForReturn };
+				}
 			}
 		});
 
-		syncHeroInput = heroInput.sync;
-		syncHeroInput();
+		function readyAtBoundary() {
+			phase = 'ready';
+			heroInput.consumeGesture();
+			setLidProgress(1);
+			holdBoundary();
+		}
 
 		function initializeScrollTrigger() {
 			if (reducedMotion || disposed) return;
 
+			let restoring = true;
 			scrollContext = gsap.context(() => {
 				gsap.to(openingState, {
 					progress: 1,
@@ -318,52 +303,26 @@
 					scrollTrigger: {
 						trigger: section,
 						start: 'top top',
-						end: 'bottom bottom',
+						end: () => `+=${section.offsetHeight - heroCanvas.offsetHeight}`,
 						scrub: true,
 
 						onRefresh: (self) => {
 							openingTrigger = self;
-							syncHeroInput();
-						},
-
-						onUpdate: (self) => {
-							openingTrigger = self;
-
-							if (phase === 'opening' && self.progress >= 0.998) {
-								phase = 'ready';
-								setLidProgress(1);
-								holdBoundary();
-								syncHeroInput();
-							}
-
-							if (phase === 'ready' && self.progress < 0.999) {
-								phase = 'opening';
-								releaseBoundary();
-								syncHeroInput();
-							}
+							if (!releaseBoundaryScroll) return;
+							cancelAnimationFrame(boundaryRefreshFrame);
+							boundaryRefreshFrame = requestAnimationFrame(() => {
+								if (releaseBoundaryScroll) holdBoundary();
+							});
 						},
 
 						onLeave: (self) => {
 							openingTrigger = self;
-
-							if (phase === 'opening' || phase === 'ready') {
-								setLidProgress(1);
-								phase = 'ready';
-								holdBoundary();
-								syncHeroInput();
-							}
+							if (!restoring && phase === 'opening') enterExperience();
 						},
 
 						onEnterBack: (self) => {
 							openingTrigger = self;
-
-							if (phase === 'experience' && !isScrollLocked()) {
-								stopAtExperienceBoundary();
-							} else if (phase === 'ready' && self.progress < 0.999) {
-								phase = 'opening';
-								releaseBoundary();
-								syncHeroInput();
-							}
+							if (!restoring && phase === 'experience' && !isScrollLocked()) holdForReturn();
 						},
 
 						invalidateOnRefresh: true
@@ -378,6 +337,7 @@
 			}, section);
 
 			ScrollTrigger.refresh();
+			restoring = false;
 
 			if (openingTrigger) {
 				const start = openingTrigger.start;
@@ -391,26 +351,23 @@
 				if (restoreExperience) {
 					releaseBoundary();
 					setLidProgress(1);
-					transition.progress(1).pause();
 					phase = 'experience';
+					transition.pause().progress(1, true);
 				} else if (y >= end - 4) {
-					setLidProgress(1);
-					transition.progress(0).pause();
-					phase = 'ready';
-					holdBoundary();
+					transition.pause().progress(0, true);
+					readyAtBoundary();
 				} else {
 					releaseBoundary();
 					const progress = MathUtils.clamp((y - start) / Math.max(1, end - start), 0, 1);
 
 					openingState.progress = progress;
 					setLidProgress(smoothstep(0, 1, progress));
-					transition.progress(0).pause();
 					phase = 'opening';
+					transition.pause().progress(0, true);
 				}
 
 				renderTransition();
 				saveHmrState();
-				syncHeroInput();
 			}
 		}
 
@@ -452,7 +409,6 @@
 						heroCanvas.style.removeProperty('opacity');
 						glow.style.removeProperty('opacity');
 
-						document.body.style.overflow = previousOverflow;
 						releaseIntroScroll?.();
 						releaseIntroScroll = undefined;
 
@@ -533,10 +489,7 @@
 			saveHmrState();
 
 			disposed = true;
-
-			document.body.style.overflow = previousOverflow;
-			releaseIntroScroll?.();
-			releaseBoundary();
+			cancelAnimationFrame(boundaryRefreshFrame);
 
 			gsap.ticker.remove(tick);
 
@@ -544,6 +497,8 @@
 			transition.kill();
 			scrollContext?.revert();
 			heroInput.destroy();
+			releaseIntroScroll?.();
+			releaseBoundary();
 
 			resizeObserver.disconnect();
 			visibilityObserver.disconnect();

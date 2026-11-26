@@ -5,17 +5,33 @@
 	import { bindManifesto } from './manifesto';
 	import { bindPrinciples } from './principles';
 
+	const designPrinciples = [
+		{
+			title: 'Question.',
+			description: '무엇을 만들 것인지보다, 누구에게 왜 필요한지를 먼저 고민합니다.'
+		},
+		{
+			title: 'Structure.',
+			description: '복잡한 아이디어를 명확하고 직관적인 구조로 정리합니다.'
+		},
+		{
+			title: 'Detail.',
+			description: '작은 디테일까지 다듬어 경험의 완성도를 높입니다.'
+		}
+	].map((principle, index) => ({ ...principle, number: String(index + 1).padStart(2, '0') }));
+	const manifestoQuestionText = 'WHAT MATTERS?';
+
 	let experience: HTMLElement;
 	let introTitle: HTMLHeadingElement;
 	let introDescription: HTMLParagraphElement;
 	let principles: HTMLElement;
-	let principlesLayout: HTMLDivElement;
 	let about: HTMLElement;
 	let aboutLayout: HTMLDivElement;
 	let aboutDescription: HTMLParagraphElement;
 	let manifesto: HTMLElement;
-	let manifestoFill: HTMLDivElement;
+	let manifestoQuestion: HTMLParagraphElement;
 	let manifestoLabel: HTMLParagraphElement;
+	let manifestoTexture: HTMLCanvasElement;
 
 	onMount(() => {
 		gsap.registerPlugin(ScrollTrigger);
@@ -44,14 +60,16 @@
 				return window.scrollY + Math.max(sectionTop, position - viewportPosition);
 			}
 
-			const principleItems = principlesLayout.querySelectorAll('.principle-item');
-			const principlesStage = bindPrinciples(experience, principles, principleItems, () =>
-				startAt(principleItems[0].getBoundingClientRect().bottom, window.innerHeight - 24)
-			);
+			const principlesStage = bindPrinciples(experience, principles, () => {
+				const { top, height } = principles.getBoundingClientRect();
+				return startAt(top + height / 2, window.innerHeight / 2);
+			});
+
 			const manifestoStage = bindManifesto(
 				experience,
 				manifesto,
-				manifestoFill,
+				manifestoTexture,
+				manifestoQuestion,
 				manifestoLabel.querySelectorAll('.manifesto-word'),
 				() => {
 					const { top, height } = manifesto.getBoundingClientRect();
@@ -59,30 +77,26 @@
 				},
 				principlesStage.canContinue
 			);
+
 			const aboutWords = aboutDescription.querySelectorAll('span');
-			let aboutHighlight: gsap.Context | undefined;
+			gsap.fromTo(
+				aboutWords,
+				{ '--word-highlight': '0%' },
+				{
+					'--word-highlight': '100%',
+					duration: 1,
+					stagger: 1,
+					ease: 'none',
+					scrollTrigger: {
+						trigger: aboutDescription,
+						start: 'top 85%',
+						end: 'clamp(bottom 45%)',
+						scrub: true
+					}
+				}
+			);
 
-			function startAboutHighlight() {
-				aboutHighlight ??= gsap.context(() => {
-					gsap.fromTo(
-						aboutWords,
-						{ '--word-highlight': '0%' },
-						{
-							'--word-highlight': '100%',
-							duration: 1,
-							stagger: 1,
-							ease: 'none',
-							scrollTrigger: {
-								trigger: aboutDescription,
-								start: 'top 85%',
-								end: 'bottom 45%',
-								scrub: true
-							}
-						}
-					);
-				});
-			}
-
+			let aboutShown = false;
 			const aboutReveal = gsap.fromTo(
 				aboutLayout,
 				{ opacity: 0, y: 18 },
@@ -92,51 +106,57 @@
 					duration: 0.38,
 					ease: 'power2.out',
 					paused: true,
-					onComplete: startAboutHighlight
+					onReverseComplete: () => about.removeAttribute('data-reveal-started')
 				}
 			);
 
-			function showAbout({ start, direction }: ScrollTrigger) {
-				if (
-					direction < 0 ||
-					about.hasAttribute('data-reveal-started') ||
-					!manifestoStage.canContinue() ||
-					window.scrollY < start
-				)
-					return;
+			function setAboutShown(shown: boolean) {
+				if (shown === aboutShown) return;
+				aboutShown = shown;
+				if (shown) {
+					about.setAttribute('data-reveal-started', '');
+					aboutReveal.play();
+				} else if (aboutReveal.progress() > 0) {
+					aboutReveal.reverse();
+				} else {
+					aboutReveal.pause();
+					about.removeAttribute('data-reveal-started');
+				}
+			}
 
-				about.setAttribute('data-reveal-started', '');
-				aboutReveal.play();
+			function syncAbout({ start }: ScrollTrigger) {
+				setAboutShown(manifestoStage.canContinue() && window.scrollY >= start);
 			}
 
 			const aboutTrigger = ScrollTrigger.create({
 				trigger: about,
 				start: 'top 90%',
 				end: 'max',
-				onUpdate: showAbout
+				onUpdate: syncAbout,
+				onRefresh: syncAbout
 			});
 
 			function resetAbout() {
-				const alreadyPassed = manifestoStage.canContinue() && about.getBoundingClientRect().top < 0;
-				about.toggleAttribute('data-reveal-started', alreadyPassed);
-				aboutReveal.pause().totalProgress(alreadyPassed ? 1 : 0, true);
-				if (alreadyPassed) {
-					startAboutHighlight();
-				} else {
-					aboutHighlight?.revert();
-					aboutHighlight = undefined;
-				}
-				showAbout(aboutTrigger);
+				aboutShown = manifestoStage.canContinue() && about.getBoundingClientRect().top < 0;
+				about.toggleAttribute('data-reveal-started', aboutShown);
+				aboutReveal.pause().totalProgress(aboutShown ? 1 : 0, true);
+				syncAbout(aboutTrigger);
+			}
+
+			function leaveExperience() {
+				introReveal.reverse();
+				setAboutShown(false);
 			}
 
 			resetAbout();
 			revealTarget.addEventListener('experience-reveal-start', resetAbout);
+			revealTarget.addEventListener('experience-reveal-leave', leaveExperience);
 
 			return () => {
 				revealTarget.removeEventListener('experience-reveal-start', playIntro);
 				revealTarget.removeEventListener('experience-reveal-start', resetAbout);
+				revealTarget.removeEventListener('experience-reveal-leave', leaveExperience);
 				about.removeAttribute('data-reveal-started');
-				aboutHighlight?.revert();
 				manifestoStage.destroy();
 				principlesStage.destroy();
 			};
@@ -170,29 +190,33 @@
 					</p>
 				</header>
 
-				<section class="principles" bind:this={principles}>
-					<div class="principles-layout" bind:this={principlesLayout}>
-						<div class="principle-item">
-							<span class="principle-index text-eyebrow">01</span>
-							<h4 class="principle-title">Question.</h4>
-							<p class="principle-description">
-								무엇을 만들 것인지보다, 누구에게 왜 필요한지를 먼저 고민합니다.
-							</p>
+				<section class="principles" aria-label="디자인 원칙" bind:this={principles}>
+					<span class="principles-label text-eyebrow">DESIGN PRINCIPLES</span>
+
+					<div class="principles-body">
+						<div class="principles-list">
+							{#each designPrinciples as principle, index (principle.title)}
+								<div class="principles-item" class:is-active={index === 0}>
+									<span class="principles-marker" aria-hidden="true"></span>
+									<span class="principles-index text-eyebrow">{principle.number}</span>
+									<h3 class="principles-title">{principle.title}</h3>
+								</div>
+							{/each}
 						</div>
 
-						<div class="principle-item">
-							<span class="principle-index text-eyebrow">02</span>
-							<h4 class="principle-title">Structure.</h4>
-							<p class="principle-description">
-								복잡한 아이디어를 명확하고 직관적인 구조로 정리합니다.
-							</p>
+						<div class="principles-details" aria-live="polite" aria-atomic="true">
+							{#each designPrinciples as principle, index (principle.title)}
+								<div class="principles-detail" class:is-active={index === 0}>
+									<p class="principles-description">{principle.description}</p>
+								</div>
+							{/each}
 						</div>
+					</div>
 
-						<div class="principle-item">
-							<span class="principle-index text-eyebrow">03</span>
-							<h4 class="principle-title">Detail.</h4>
-							<p class="principle-description">작은 디테일까지 다듬어 경험의 완성도를 높입니다.</p>
-						</div>
+					<div class="principles-progress" aria-hidden="true">
+						{#each designPrinciples as principle, index (principle.title)}
+							<span class="principles-segment" class:is-active={index === 0}></span>
+						{/each}
 					</div>
 				</section>
 			</div>
@@ -200,9 +224,27 @@
 
 		<!-- Manifesto -->
 		<section class="manifesto" aria-labelledby="manifesto-title" bind:this={manifesto}>
-			<div class="manifesto-fill" aria-hidden="true" bind:this={manifestoFill}></div>
+			<canvas class="manifesto-texture" aria-hidden="true" bind:this={manifestoTexture}></canvas>
+			<svg class="manifesto-filters" width="0" height="0" aria-hidden="true">
+				<defs>
+					<filter id="manifesto-question-outline">
+						<feMorphology in="SourceAlpha" operator="erode" radius="1.1" result="interior" />
+						<feComposite in="SourceGraphic" in2="interior" operator="out" />
+					</filter>
+				</defs>
+			</svg>
 			<div class="page-container">
-				<p id="manifesto-title" class="manifesto-label" bind:this={manifestoLabel}>
+				<p
+					class="manifesto-type manifesto-question"
+					aria-hidden="true"
+					bind:this={manifestoQuestion}
+				>
+					<span class="manifesto-question-outline">{manifestoQuestionText}</span>
+					<span class="manifesto-question-fill">
+						<span class="manifesto-question-contours">{manifestoQuestionText}</span>
+					</span>
+				</p>
+				<p id="manifesto-title" class="manifesto-type manifesto-label" bind:this={manifestoLabel}>
 					<span class="sr-only">DESIGNED TO MATTER.</span>
 					<span class="manifesto-word" aria-hidden="true">DESIGNED</span>
 					<span class="manifesto-phrase" aria-hidden="true">
@@ -303,6 +345,7 @@
 
 	.experience {
 		--experience-section-gap: clamp(6rem, 10vw, 19rem);
+		--principles-gap: clamp(7rem, 12vw, 20rem);
 
 		position: relative;
 		z-index: 4;
@@ -338,7 +381,7 @@
 	/* Intro */
 
 	.intro-content {
-		margin-bottom: clamp(3rem, 6vw, 6rem);
+		margin-bottom: var(--principles-gap);
 	}
 
 	.intro-description {
@@ -348,43 +391,154 @@
 
 	/* Principles */
 
-	.principles-layout {
+	.principles {
 		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-		gap: var(--grid-gap);
-		align-items: start;
+		gap: clamp(1.25rem, 3vw, 2.75rem);
 	}
 
-	.principle-item {
+	.principles .text-eyebrow {
+		font-size: clamp(0.625rem, 1vw, 0.75rem);
+	}
+
+	.principles-progress {
 		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		min-width: 0;
+		justify-self: end;
+		gap: 4px;
+		margin-block-start: clamp(0.5rem, 2.2vw, 1.75rem);
 	}
 
-	.principle-index {
-		margin-bottom: 16px;
-	}
-
-	.principle-title {
-		align-self: stretch;
-		margin-bottom: 0;
-
-		font-size: var(--font-size-h3);
-		line-height: var(--type-h3-leading);
-	}
-
-	.principle-title::after {
-		content: '';
-		display: block;
-		width: 20%;
-		height: 1px;
-		margin-top: 16px;
+	.principles-segment {
+		inline-size: clamp(1.125rem, 3.3vw, 2.75rem);
+		block-size: 2px;
 		background: var(--border);
+		transition: background-color 220ms ease;
 	}
 
-	.principle-description {
-		margin-top: 16px;
+	.principles-segment.is-active {
+		background: var(--accent);
+	}
+
+	.principles-body {
+		display: grid;
+		grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+		gap: clamp(1rem, 2.25vw, 2.5rem);
+		align-items: center;
+	}
+
+	.principles-item {
+		display: grid;
+		grid-template-columns: clamp(1.2rem, 1.45vw, 1.5rem) minmax(0, 1fr);
+		align-content: center;
+		align-items: center;
+		column-gap: clamp(0.5rem, 1.25vw, 1.125rem);
+		row-gap: clamp(0.2rem, 0.5vw, 0.45rem);
+		min-block-size: clamp(3.4rem, min(9.5vw, 13svh), 6.75rem);
+		padding-block: 0.5rem;
+		border-bottom: 1px solid var(--border);
+	}
+
+	.principles-marker {
+		position: relative;
+		grid-row: 1 / span 2;
+		grid-column: 1;
+		justify-self: center;
+		inline-size: clamp(0.8rem, 0.95vw, 1rem);
+		aspect-ratio: 1;
+		border: 1px solid color-mix(in srgb, var(--muted) 65%, var(--background));
+		transform: rotate(45deg);
+	}
+
+	.principles-marker::after {
+		content: '';
+		position: absolute;
+		inset: 26%;
+		background: var(--accent);
+		opacity: 0;
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.principles-marker {
+			transition: border-color 220ms ease;
+		}
+
+		.principles-marker::after {
+			transition: opacity 220ms ease;
+		}
+
+		.principles-item.is-active .principles-marker {
+			border-color: var(--accent);
+		}
+
+		.principles-item.is-active .principles-marker::after {
+			opacity: 1;
+		}
+	}
+
+	.principles-index {
+		grid-area: 1 / 2;
+		transition: color 220ms ease;
+	}
+
+	.principles-title {
+		grid-area: 2 / 2;
+		min-width: 0;
+		margin: 0;
+		font-size: clamp(1.5rem, 3.3vw, 3.25rem);
+		font-weight: 400;
+		line-height: 1.12;
+		letter-spacing: -0.045em;
+		color: color-mix(in srgb, var(--foreground) 52%, var(--background));
+		transition:
+			color 220ms ease,
+			font-weight 220ms ease;
+	}
+
+	.principles-item.is-active .principles-title {
+		color: var(--foreground);
+		font-weight: 600;
+	}
+
+	.principles-item.is-active .principles-index {
+		color: var(--accent);
+	}
+
+	.principles-details {
+		display: grid;
+		perspective: 1000px;
+	}
+
+	.principles-detail {
+		display: grid;
+		grid-area: 1 / 1;
+		align-content: center;
+		gap: clamp(0.8rem, 1.7vw, 1.5rem);
+		min-inline-size: 0;
+		max-inline-size: 42rem;
+		padding-block: clamp(0.75rem, 1.75vw, 1.5rem);
+		opacity: 0;
+		visibility: hidden;
+		backface-visibility: hidden;
+	}
+
+	.principles-detail::before {
+		content: '';
+		inline-size: clamp(1.5rem, 3vw, 2.5rem);
+		block-size: 1px;
+		background: var(--accent);
+	}
+
+	.principles-detail.is-active {
+		opacity: 1;
+		visibility: visible;
+	}
+
+	.principles-description {
+		margin: 0;
+		font-size: clamp(1.125rem, 2.4vw, 2.15rem);
+		font-weight: 500;
+		line-height: 1.5;
+		letter-spacing: var(--type-lead-tracking);
+		word-break: keep-all;
 	}
 
 	/* Manifesto */
@@ -394,27 +548,56 @@
 		isolation: isolate;
 		display: grid;
 		align-items: center;
-		min-block-size: clamp(7rem, 13vw, 14rem);
-		margin-block: var(--experience-section-gap);
+		min-block-size: clamp(12rem, 23vw, 24rem);
+		margin-block: var(--principles-gap) var(--experience-section-gap);
 		padding-block: clamp(1.25rem, 2vw, 2.25rem);
+		overflow: hidden;
 
-		color: var(--background);
+		color: var(--foreground);
+		background: var(--background);
+		border-block: 1px solid var(--border);
+	}
+
+	.manifesto > .page-container {
+		position: relative;
+		z-index: 2;
+		width: 100%;
 	}
 
 	@media (prefers-reduced-motion: no-preference) {
-		.manifesto:not([data-reveal-started]),
+		.manifesto:not([data-reveal-started]) .manifesto-label,
 		.about:not([data-reveal-started]) {
 			visibility: hidden;
 		}
 	}
 
-	.manifesto-fill {
+	.manifesto-texture {
 		position: absolute;
 		inset: 0;
-		z-index: -1;
-		background: var(--accent);
-		transform-origin: left center;
+		z-index: 0;
+		display: block;
+		width: 100%;
+		height: 100%;
 		pointer-events: none;
+	}
+
+	.manifesto-texture:not([data-webgl]) {
+		background-image: repeating-radial-gradient(
+			ellipse 82% 145% at 86% 15%,
+			transparent 0 14px,
+			color-mix(in srgb, var(--accent) 46%, transparent) 15px,
+			transparent 16px 19px
+		);
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.manifesto-texture:not([data-webgl]) {
+			mask-image: linear-gradient(
+				to top,
+				black calc(var(--manifesto-reveal, 0%) * 1.16 - 10%),
+				transparent calc(var(--manifesto-reveal, 0%) * 1.16)
+			);
+		}
 	}
 
 	.manifesto-label,
@@ -423,14 +606,61 @@
 		gap: 0.22em;
 	}
 
-	.manifesto-label {
-		flex-wrap: wrap;
-		row-gap: 0;
+	.manifesto-type {
 		font-family: var(--font-display);
 		font-size: clamp(2rem, 7.5vw, 8.5rem);
 		font-weight: 600;
 		line-height: 1.05;
 		letter-spacing: var(--type-display-tracking);
+	}
+
+	.manifesto-filters {
+		position: absolute;
+		pointer-events: none;
+	}
+
+	.manifesto-question {
+		--contour-fill: 0%;
+
+		display: none;
+		position: absolute;
+		inset-block-start: 50%;
+		inset-inline-start: var(--page-gutter);
+		margin: 0;
+		translate: 0 -50%;
+		white-space: nowrap;
+		pointer-events: none;
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.manifesto-question {
+			display: block;
+		}
+	}
+
+	.manifesto-question-outline {
+		display: block;
+		filter: url('#manifesto-question-outline');
+		opacity: calc(72% - var(--contour-fill) * 0.34);
+	}
+
+	.manifesto-question-fill {
+		position: absolute;
+		inset: 0;
+		clip-path: inset(calc(100% - var(--contour-fill)) 0 0);
+	}
+
+	.manifesto-question-contours {
+		display: block;
+		color: transparent;
+		background-color: color-mix(in srgb, var(--accent) 72%, var(--foreground));
+		background-clip: text;
+		mask: url('./manifesto-contours.svg') center / 100% 100% no-repeat;
+	}
+
+	.manifesto-label {
+		flex-wrap: wrap;
+		row-gap: 0;
 	}
 
 	.manifesto-word {
@@ -492,13 +722,15 @@
 	/* Responsive */
 
 	@media (max-width: 768px) {
+		.manifesto-type {
+			font-size: 7.5vw;
+		}
+
 		.manifesto-label {
 			flex-wrap: nowrap;
-			font-size: 7.5vw;
 			white-space: nowrap;
 		}
 
-		.principles-layout,
 		.about-layout {
 			grid-template-columns: 1fr;
 			gap: 32px;
@@ -508,11 +740,52 @@
 			width: clamp(9rem, 40vw, 14rem);
 			max-width: 100%;
 		}
+
+		.principles-body {
+			grid-template-columns: 1fr;
+			gap: clamp(2rem, 9vw, 2.5rem);
+		}
+
+		.principles-item {
+			grid-template-columns: 1rem minmax(0, 1fr);
+			column-gap: 0.6875rem;
+			row-gap: 0.35rem;
+			min-block-size: clamp(4rem, 8.25svh, 4.75rem);
+			padding-block: 0.625rem;
+		}
+
+		.principles-marker {
+			inline-size: 0.74rem;
+		}
 	}
 
 	/* Reduced Motion */
 
 	@media (prefers-reduced-motion: reduce) {
+		.principles-body {
+			grid-template-columns: 1fr;
+		}
+
+		.principles-details {
+			gap: 1.5rem;
+			perspective: none;
+		}
+
+		.principles-detail {
+			grid-area: auto;
+			visibility: visible;
+			opacity: 1;
+			transform: none;
+		}
+
+		.principles-progress {
+			display: none;
+		}
+
+		.principles-item .principles-title {
+			color: var(--foreground);
+		}
+
 		.experience {
 			min-height: auto;
 			margin-top: 0;
